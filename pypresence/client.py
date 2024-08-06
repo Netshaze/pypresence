@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import struct
 import json
@@ -7,6 +8,7 @@ from typing import List
 from .baseclient import BaseClient
 from .exceptions import *
 from .payloads import Payload
+from .types import ActivityType
 
 
 class Client(BaseClient):
@@ -120,6 +122,7 @@ class Client(BaseClient):
         return self.loop.run_until_complete(self.read_output())
 
     def set_activity(self, pid: int = os.getpid(),
+                     activity_type: ActivityType = None,
                      state: str = None, details: str = None,
                      start: int = None, end: int = None,
                      large_image: str = None, large_text: str = None,
@@ -128,8 +131,8 @@ class Client(BaseClient):
                      join: str = None, spectate: str = None,
                      match: str = None, buttons: list = None,
                      instance: bool = True):
-        payload = Payload.set_activity(pid=pid, state=state, details=details, start=start, end=end,
-                                       large_image=large_image, large_text=large_text, small_image=small_image,
+        payload = Payload.set_activity(pid=pid, activity_type=activity_type, state=state, details=details, start=start,
+                                       end=end, large_image=large_image, large_text=large_text, small_image=small_image,
                                        small_text=small_text, party_id=party_id, party_size=party_size, join=join,
                                        spectate=spectate, match=match, buttons=buttons, instance=instance,
                                        activity=True)
@@ -225,7 +228,7 @@ class AioClient(BaseClient):
         del self._events[event]
 
     # noinspection PyProtectedMember
-    async def on_event(self, data):
+    def on_event(self, data):
         if self.sock_reader._eof:
             raise PyPresenceException('feed_data after feed_eof')
         if not data:
@@ -247,7 +250,7 @@ class AioClient(BaseClient):
         if payload["evt"] is not None:
             evt = payload["evt"].lower()
             if evt in self._events:
-                await self._events[evt](payload["data"])
+                asyncio.create_task(self._events[evt](payload["data"]))
             elif evt == 'error':
                 raise DiscordError(payload["data"]["code"], payload["data"]["message"])
 
@@ -304,6 +307,7 @@ class AioClient(BaseClient):
         return await self.read_output()
 
     async def set_activity(self, pid: int = os.getpid(),
+                           activity_type: ActivityType = None,
                            state: str = None, details: str = None,
                            start: int = None, end: int = None,
                            large_image: str = None, large_text: str = None,
@@ -312,9 +316,9 @@ class AioClient(BaseClient):
                            join: str = None, spectate: str = None,
                            buttons: list = None,
                            match: str = None, instance: bool = True):
-        payload = Payload.set_activity(pid, state, details, start, end, large_image, large_text,
-                                       small_image, small_text, party_id, party_size, join, spectate,
-                                       match, buttons, instance, activity=True)
+        payload = Payload.set_activity(pid, activity_type, state, details, start, end, large_image,
+                                       large_text, small_image, small_text, party_id, party_size,
+                                       join, spectate, match, buttons, instance, activity=True)
         self.send_data(1, payload)
         return await self.read_output()
 
